@@ -1,5 +1,7 @@
 # loom
 
+[![ci](https://github.com/wygxxdm/Loom/actions/workflows/ci.yml/badge.svg)](https://github.com/wygxxdm/Loom/actions/workflows/ci.yml)
+
 用 TypeScript 写的 coding agent harness。模型通过工具调用读写文件、执行命令，harness 负责拼装这些能力，并处理上下文、权限、会话和预算。
 
 模型、工具、会话存储、权限策略都是可替换的插件，插件之间通过声明的依赖关系装配。
