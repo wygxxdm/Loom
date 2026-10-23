@@ -1,0 +1,175 @@
+# loom
+
+用 TypeScript 写的 coding agent harness。模型通过工具调用读写文件、执行命令，harness 负责拼装这些能力，并处理上下文、权限、会话和预算。
+
+模型、工具、会话存储、权限策略都是可替换的插件，插件之间通过声明的依赖关系装配。
+
+零运行时依赖，零构建步骤。
+
+## 状态
+
+早期版本，接口还会变。目前 65 个测试，跑在 Node 22 上。
+
+## 要求
+
+Node >= 22.6。项目直接用 `--experimental-strip-types` 运行 `.ts` 源码，所以不需要 `npm install`，也没有编译产物。
+
+## 快速开始
+
+```bash
+# 不需要 API key：scripted 模型按预设步骤调用工具
+node --experimental-strip-types src/cli.ts --task "看看项目结构" --model scripted
+
+# 真实任务
+export DEEPSEEK_API_KEY=sk-...
+node --experimental-strip-types src/cli.ts \
+  --task "修掉 src/clamp.ts 里上下界写反的问题" \
+  --workspace /path/to/repo \
+  --plan --yes
+```
+
+`--plan` 会先让模型产出一份结构化任务规格再执行。`--yes` 把写文件和执行命令的权限授到本次 run；不加的话会逐次询问，非 TTY 环境默认拒绝。
+
+## 命令行
+
+| 参数 | 说明 |
+| --- | --- |
+| `--task <text>` | 要执行的任务；不传则进入交互模式 |
+| `--workspace <dir>` | 工作目录，默认当前目录 |
+| `--model <kind>` | `deepseek` 或 `scripted`，默认按有没有 `DEEPSEEK_API_KEY` 判断 |
+| `--plan` | 先规划再执行 |
+| `--optimize` | 先改写需求再执行，多一次模型调用 |
+| `--session <id>` | 会话 id |
+| `--session-dir <dir>` | 会话目录，默认 `~/.loom/sessions` |
+| `--resume` | 续跑上次因预算耗尽中断的任务 |
+| `--ephemeral` | 会话只留内存，不落盘 |
+| `--yes` | 自动授权写和命令执行 |
+| `--max-rounds <n>` | 模型请求轮次上限，默认 32 |
+| `--max-tool-calls <n>` | 工具调用数上限，默认 96 |
+| `--timeout-ms <n>` | 单次运行墙钟上限，默认 480000 |
+| `--quiet` | 只输出最终结果 |
+
+## 交互模式
+
+不带 `--task` 时进入 REPL：
+
+| 命令 | 说明 |
+| --- | --- |
+| `/sessions` | 列出会话 |
+| `/use <id>` | 切换会话 |
+| `/new [id]` | 新建会话 |
+| `/delete <id>` | 删除会话 |
+| `/history [n]` | 查看最近 n 条记录 |
+| `/plan [text]` | 查看当前任务规格；带文本则先规划 |
+| `/context` | 上下文用量 |
+| `/compact` | 立即压缩一次 |
+| `/continue` | 续跑上次中断的任务 |
+| `/pwd` / `/cd <path>` | 查看 / 切换工作目录，切换时新建会话 |
+| `/quit` | 退出 |
+
+## 目录
+
+```
+src/
+  kernel/        容器、能力键、插件协议、依赖解析
+  contracts/     端口定义，只有类型
+  plugins/       各能力的实现
+  runtime.ts     装配
+  cli.ts         入口
+test/            node:test
+bench/           对照实验
+```
+
+`runtime.ts` 里没有写死的加载顺序：每个插件声明 `needs` / `provides`，`resolveOrder()` 做拓扑排序，顺带检查缺提供者、循环依赖和同一能力被重复提供。
+
+```
+events → session → session-catalog → tools → file-tools → shell-tool
+       → permission → guard → model → optimizer → planning → compactor → agent-loop
+```
+
+## 实现说明
+
+**会话和上下文是两样东西。** Session 是 append-only 的 JSONL，只追加不修改；发给模型的上下文每轮重新构建，超过阈值时压缩。压缩只影响这一次请求的投影，磁盘上的历史不动。
+
+**一轮写一个批次。** 模型的工具调用和这轮全部工具结果合并成一次写入并 fsync，崩溃最多丢整批。载入时扫一遍没有对应结果的调用，补一条失败记录，否则续跑时消息顺序不合法，API 直接返回 400。
+
+**token 估算会自校准。** 本地估算是 ASCII/4 + 非 ASCII×1，偏保守。运行时拿服务端返回的 `prompt_tokens` 做 EMA 修正，压缩阈值按修正后的值判断。
+
+**摘要失败会降级。** 生成摘要的模型调用出错时，退回只裁剪不摘要，任务继续跑。
+
+**只读工具并发。** 同一批里 `read-only` 的调用最多 4 个并发，其余按顺序执行，结果按调用顺序回填。
+
+**重复调用有护栏。** 相同工具加相同参数在滑动窗口里第 3 次出现时，插一条提醒，同一个指纹只提醒一次。
+
+## 权限
+
+风险分六级，前三档自动放行：
+
+| 等级 | 例子 | 默认 |
+| --- | --- | --- |
+| `read-only` | `read_file`、`list_dir` | 放行 |
+| `agent-state` | `update_task` | 放行 |
+| `shell-low` | `ls`、`cat`、`git status` | 放行 |
+| `workspace-write` | `write_file`、`edit_file`、`delete_file` | 需要授权 |
+| `shell` | `npm test`、`git push` | 需要授权 |
+| `shell-high` | 含管道、重定向、命令替换的命令 | 需要授权 |
+
+授权范围四档：`once`、`run`、`task`、`session`。预算耗尽时保留 task 级授权，`--resume` 或 `/continue` 接着跑不用重新确认。
+
+授权键是 `tool:risk`，不包含参数。
+
+`run_command` 走的是真 shell，管道和重定向可以用。判断风险靠一个引号感知的词法扫描：出现未加引号的 `` | & ; < > $ ` ( ) `` 就判 `shell-high`；可执行文件在只读白名单里（`ls`、`cat`、`grep`、`git status` 等）判 `shell-low`；其余判 `shell`。命令放在独立进程组里，超时用 `kill(-pid)` 整组回收。
+
+## 工具
+
+| 工具 | 风险 | 说明 |
+| --- | --- | --- |
+| `read_file` | `read-only` | 支持 offset / limit |
+| `list_dir` | `read-only` | 单层，不递归 |
+| `write_file` | `workspace-write` | 整文件创建或覆盖 |
+| `edit_file` | `workspace-write` | 按片段精确替换 |
+| `delete_file` | `workspace-write` | 软删除到 `.loom/trash/` |
+| `run_command` | `shell` / `shell-low` / `shell-high` | 见上 |
+| `update_task` | `agent-state` | 更新任务进度 |
+
+`edit_file` 有三条约束：精确匹配，不做空白归一化；`old` 在文件里必须唯一，出现多次就报错，除非显式 `replaceAll`；任何校验失败都不写盘，文件保持原样。
+
+`delete_file` 不调 unlink，把文件移到 `.loom/trash/` 并返回原路径，可以手工移回。目录和符号链接一律拒绝。这里有个细节：路径解析对父目录做 realpath 校验，对最后一段只做 `lstat`。如果用 realpath 解析末段，删一条指向 A 的符号链接会变成删掉 A。
+
+## benchmark
+
+```bash
+node --experimental-strip-types bench/runner.ts
+node --experimental-strip-types bench/runner.ts --model deepseek --repeat 3
+```
+
+4 个任务，4 个臂：`baseline`、`compact`、`optimize`、`full`。agent 在副本里工作，验证之前用工作区外的原始 spec 覆盖回去，改测试不算通过。
+
+`scripted` 模式只是流水线冒烟：模型按预设脚本执行，跑出来的成功率没有参考价值。要看数字得用 `--model deepseek`，并且每个任务跑多次。
+
+## 开发
+
+```bash
+npm test        # 65 个用例
+npm run smoke   # 用 scripted 模型跑一遍 CLI
+npm run bench   # 四臂流水线
+```
+
+CI 在 ubuntu 和 macos 上跑这三条。
+
+## 已知限制
+
+- 没有沙箱。命令直接在宿主机执行，风险分级和授权是唯一的闸门。要做到真正隔离得靠 Docker、`sandbox-exec` 或 seccomp。
+- 子进程继承全部环境变量，包括 `DEEPSEEK_API_KEY`。
+- 授权键不含参数，`allow-run` 会放大到同风险等级的其它调用。
+- 单进程单会话。`childScope()` 已经实现，但 runtime 还没用起来，多会话并发会串状态。
+- 摘要状态只存在内存里，续跑时会重新总结一次。
+- 没有流式输出，`model.run()` 一次性返回。
+- 工具参数没有做 JSON Schema 校验，类型错了会在工具内部抛出来。
+- 上下文窗口上限是配置常量，没有从模型读取。
+- Windows 没验证过，进程组回收依赖 POSIX 语义。
+- benchmark 只有 4 题，是流水线样本，不是评测集。
+
+## License
+
+MIT
