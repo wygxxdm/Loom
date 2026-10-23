@@ -1,0 +1,44 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }} / node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: [22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: node version
+        run: node --version
+
+      # 项目没有依赖，也不需要构建：直接跑源码。
+      - name: unit tests
+        run: npm test
+
+      - name: cli smoke (scripted model, no api key)
+        run: npm run smoke
+
+      # 只验证四臂流水线能跑通，不衡量能力差异。
+      - name: bench pipeline (scripted, not a measurement)
+        run: npm run bench

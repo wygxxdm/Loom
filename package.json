@@ -1,0 +1,25 @@
+{
+  "name": "loom",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A plugin-woven coding agent harness. Zero runtime dependencies, zero build step.",
+  "license": "MIT",
+  "keywords": [
+    "agent",
+    "harness",
+    "llm",
+    "tool-calling",
+    "context-management"
+  ],
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "dev": "node --experimental-strip-types src/cli.ts",
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "smoke": "node --experimental-strip-types src/cli.ts --task \"list files\" --model scripted --workspace . --session ci --ephemeral --quiet",
+    "bench": "node --experimental-strip-types bench/runner.ts",
+    "check": "npm test && npm run smoke"
+  }
+}
