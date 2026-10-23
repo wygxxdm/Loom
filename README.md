@@ -10,7 +10,7 @@
 
 ## 状态
 
-早期版本，接口还会变。目前 65 个测试，跑在 Node 22 上。
+早期版本，接口还会变。目前 68 个测试，跑在 Node 22 上。
 
 ## 要求
 
@@ -172,7 +172,7 @@ node --experimental-strip-types bench/runner.ts --only fix-clamp,fix-deep-merge 
 ## 开发
 
 ```bash
-npm test        # 65 个用例
+npm test        # 68 个用例
 npm run smoke   # 用 scripted 模型跑一遍 CLI
 npm run bench   # 四臂流水线
 ```
