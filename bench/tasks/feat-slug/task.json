@@ -1,0 +1,14 @@
+{
+  "id": "feat-slug",
+  "category": "feature",
+  "difficulty": "easy",
+  "prompt": "src/slug.ts 里的 slugify() 还没实现。请按 spec 的要求实现它：小写、非字母数字折叠成单个连字符、去掉首尾连字符。",
+  "verify": {
+    "command": "node --experimental-strip-types --test spec/slug.test.ts",
+    "timeoutMs": 30000
+  },
+  "demo": [
+    { "name": "read_file", "args": { "path": "src/slug.ts" } },
+    { "name": "write_file", "args": { "path": "src/slug.ts", "content": "export function slugify(input: string): string {\n  return input\n    .toLowerCase()\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-+|-+$/g, '')\n}\n" } }
+  ]
+}

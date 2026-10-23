@@ -1,0 +1,14 @@
+{
+  "id": "feat-range",
+  "category": "feature",
+  "difficulty": "medium",
+  "prompt": "src/range.ts 里的 range() 还没实现。要求：返回 0..count-1 的整数数组；count 为 0 或负数时返回空数组。",
+  "verify": {
+    "command": "node --experimental-strip-types --test spec/range.test.ts",
+    "timeoutMs": 30000
+  },
+  "demo": [
+    { "name": "read_file", "args": { "path": "src/range.ts" } },
+    { "name": "write_file", "args": { "path": "src/range.ts", "content": "export function range(count: number): number[] {\n  if (!Number.isFinite(count) || count <= 0) return []\n  return Array.from({ length: Math.floor(count) }, (_, index) => index)\n}\n" } }
+  ]
+}

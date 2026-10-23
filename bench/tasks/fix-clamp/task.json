@@ -1,0 +1,26 @@
+{
+  "id": "fix-clamp",
+  "category": "bugfix",
+  "difficulty": "easy",
+  "prompt": "clamp() 的上下界写反了：值低于下界时返回了上界，高于上界时返回了下界。修好它让 spec 通过。",
+  "verify": {
+    "command": "node --experimental-strip-types --test spec/clamp.test.ts",
+    "timeoutMs": 30000
+  },
+  "demo": [
+    {
+      "name": "read_file",
+      "args": {
+        "path": "src/clamp.ts"
+      }
+    },
+    {
+      "name": "edit_file",
+      "args": {
+        "path": "src/clamp.ts",
+        "old": "  if (value < low) return high\n  if (value > high) return low",
+        "new": "  if (value < low) return low\n  if (value > high) return high"
+      }
+    }
+  ]
+}

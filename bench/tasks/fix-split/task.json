@@ -1,0 +1,14 @@
+{
+  "id": "fix-split",
+  "category": "bugfix",
+  "difficulty": "medium",
+  "prompt": "splitList() 对空输入和连续逗号的处理不对：空字符串返回了 ['']，'a,,b' 里多出一个空项。修好它让 spec 通过。",
+  "verify": {
+    "command": "node --experimental-strip-types --test spec/split.test.ts",
+    "timeoutMs": 30000
+  },
+  "demo": [
+    { "name": "read_file", "args": { "path": "src/split.ts" } },
+    { "name": "write_file", "args": { "path": "src/split.ts", "content": "export function splitList(input: string): string[] {\n  return input\n    .split(',')\n    .map((part) => part.trim())\n    .filter((part) => part.length > 0)\n}\n" } }
+  ]
+}
