@@ -1,11 +1,11 @@
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import type { ModelPort, ModelReply, ModelInput, TokenUsage } from '../src/contracts/model.ts'
 import type { HarnessEvent } from '../src/contracts/events.ts'
 import { ScriptedModel, type ScriptedStep } from '../src/plugins/scripted-model.ts'
-import { DeepSeekModel } from '../src/plugins/deepseek-model.ts'
+import { DeepSeekModel, ModelHttpError } from '../src/plugins/deepseek-model.ts'
 import { createHarness } from '../src/runtime.ts'
 
 interface TaskFile {
@@ -43,6 +43,35 @@ interface Row {
   readonly ms: number
   readonly checkpoint: boolean
   readonly error?: string
+}
+
+interface Options {
+  readonly model: 'deepseek' | 'scripted'
+  readonly repeat: number
+  readonly force: boolean
+  readonly dryRun: boolean
+  readonly only: ReadonlySet<string> | undefined
+  readonly arms: ReadonlySet<string> | undefined
+}
+
+function parseOptions(argv: readonly string[]): Options {
+  const value = (flag: string): string | undefined => {
+    const index = argv.indexOf(flag)
+    return index < 0 ? undefined : argv[index + 1]
+  }
+  const list = (flag: string): ReadonlySet<string> | undefined => {
+    const raw = value(flag)
+    return raw === undefined ? undefined : new Set(raw.split(',').map((item) => item.trim()))
+  }
+
+  return {
+    model: value('--model') === 'deepseek' ? 'deepseek' : 'scripted',
+    repeat: Number(value('--repeat') ?? 1),
+    force: argv.includes('--force'),
+    dryRun: argv.includes('--dry-run'),
+    only: list('--only'),
+    arms: list('--arms'),
+  }
 }
 
 /** 包一层，只做一件事：累计服务端返回的真实用量。 */
@@ -99,6 +128,32 @@ function verify(task: TaskFile, runDir: string, pristineDir: string): { pass: bo
   return { pass: false, error: detail.length > 0 ? detail : `exit ${String(result.status)}` }
 }
 
+function isRetryable(error: unknown): boolean {
+  if (error instanceof ModelHttpError) return error.retryable
+  // fetch 在网络层失败时抛 TypeError（DNS、连接重置）。
+  return error instanceof TypeError
+}
+
+async function withRetry<T>(run: () => Promise<T>, attempts = 3): Promise<T> {
+  let lastError: unknown
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await run()
+    } catch (error: unknown) {
+      lastError = error
+      if (!isRetryable(error) || attempt === attempts) throw error
+
+      const wait = 2_000 * 3 ** (attempt - 1)
+      const detail = error instanceof Error ? error.message : String(error)
+      process.stderr.write(`    retry ${attempt}/${attempts - 1} in ${wait}ms: ${detail.slice(0, 120)}\n`)
+      await new Promise((done) => setTimeout(done, wait))
+    }
+  }
+
+  throw lastError
+}
+
 async function runOnce(
   taskDir: string,
   task: TaskFile,
@@ -140,6 +195,7 @@ async function runOnce(
   harness.events.subscribe((event) => events.push(event))
 
   let error: string | undefined
+  let fatal: unknown
   let report = { rounds: 0, calls: 0, failures: 0, ms: 0, checkpoint: false }
   let pass = false
 
@@ -161,13 +217,20 @@ async function runOnce(
     pass = verdict.pass
     error = verdict.error
   } catch (caught: unknown) {
-    error = caught instanceof Error ? caught.message : String(caught)
+    if (isRetryable(caught)) {
+      // 限流/网络错误不写结果文件，交给外层退避重试。
+      fatal = caught
+    } else {
+      error = caught instanceof Error ? caught.message : String(caught)
+    }
   } finally {
     await harness.dispose()
     rmSync(box, { recursive: true, force: true })
   }
 
-  const row: Row = {
+  if (fatal !== undefined) throw fatal
+
+  return {
     arm: arm.name,
     task: task.id,
     seed,
@@ -181,12 +244,21 @@ async function runOnce(
     checkpoint: report.checkpoint,
     ...(error === undefined ? {} : { error }),
   }
+}
 
-  const outDir = resolve('bench', 'runs', model, arm.name)
-  mkdirSync(outDir, { recursive: true })
-  writeFileSync(join(outDir, `${task.id}-s${seed}.json`), `${JSON.stringify(row, null, 2)}\n`)
+function resultPath(model: string, arm: string, taskId: string, seed: number): string {
+  return resolve('bench', 'runs', model, arm, `${taskId}-s${seed}.json`)
+}
 
-  return row
+function loadRow(path: string): Row | undefined {
+  try {
+    const row = JSON.parse(readFileSync(path, 'utf8')) as Row
+    if (typeof row.task !== 'string' || typeof row.pass !== 'boolean') return undefined
+    return row
+  } catch {
+    // 损坏的结果文件当作没跑过，重跑一次比读一半数据强。
+    return undefined
+  }
 }
 
 function mean(values: readonly number[]): number {
@@ -208,51 +280,117 @@ function summary(rows: readonly Row[], arm: string): string {
   ].join(' ')
 }
 
-async function main(): Promise<void> {
-  const argv = process.argv.slice(2)
-  const modelArg = argv.includes('--model') ? argv[argv.indexOf('--model') + 1] : 'scripted'
-  const model = modelArg === 'deepseek' ? 'deepseek' : 'scripted'
-  const repeat = argv.includes('--repeat') ? Number(argv[argv.indexOf('--repeat') + 1]) : 1
+function preview(plan: readonly { arm: Arm; task: TaskFile; seed: number }[], options: Options): void {
+  const paths = plan.map((item) => resultPath(options.model, item.arm.name, item.task.id, item.seed))
+  const cached = paths.filter((path) => existsSync(path) && loadRow(path) !== undefined).length
+  const pending = plan.length - cached
 
-  if (model === 'deepseek' && process.env.DEEPSEEK_API_KEY === undefined) {
+  const armCount = new Set(plan.map((item) => item.arm.name)).size
+  const taskCount = armCount === 0 ? 0 : plan.length / armCount / options.repeat
+
+  process.stdout.write(
+    `model=${options.model} 计划 ${plan.length} 次（${taskCount} 题 × ${armCount} 臂 × ${options.repeat} seed）\n` +
+    `已完成 ${cached}，待跑 ${pending}${options.force ? '（--force 会全部重跑）' : ''}\n`,
+  )
+
+  if (pending === 0) {
+    process.stdout.write('没有待跑的任务。\n')
+    return
+  }
+
+  const previous = paths
+    .filter((path) => existsSync(path))
+    .map((path) => loadRow(path))
+    .filter((row): row is Row => row !== undefined)
+
+  if (previous.length === 0) {
+    process.stdout.write('没有历史结果，无法估算 token；先跑一次 --repeat 1 拿基线。\n')
+    return
+  }
+
+  const perRun = mean(previous.map((row) => row.promptTokens + row.completionTokens))
+  const estimate = Math.round(perRun * pending)
+  process.stdout.write(`按已有 ${previous.length} 次结果均值 ${Math.round(perRun)} token/次，预计 ${estimate} token\n`)
+
+  const price = Number(process.env.LOOM_PRICE_PER_M ?? '0')
+  if (price > 0) {
+    process.stdout.write(`按 ${price} 元/百万 token 估算：约 ${(estimate / 1_000_000 * price).toFixed(2)} 元\n`)
+  }
+}
+
+async function main(): Promise<void> {
+  const options = parseOptions(process.argv.slice(2))
+
+  if (options.model === 'deepseek' && process.env.DEEPSEEK_API_KEY === undefined) {
     throw new Error('DEEPSEEK_API_KEY is required for --model deepseek')
   }
 
-  const tasks = readTasks(resolve('bench', 'tasks'))
-  const rows: Row[] = []
+  const tasks = readTasks(resolve('bench', 'tasks')).filter(
+    (item) => options.only === undefined || options.only.has(item.task.id),
+  )
+  const arms = ARMS.filter((arm) => options.arms === undefined || options.arms.has(arm.name))
+
   const skipped: string[] = []
+  const plan: { arm: Arm; task: TaskFile; dir: string; seed: number }[] = []
 
-  process.stdout.write(`model=${model} tasks=${tasks.length} arms=${ARMS.length} seeds=${repeat}\n`)
-
-  for (const arm of ARMS) {
+  for (const arm of arms) {
     for (const { dir, task } of tasks) {
-      if (model === 'scripted' && task.demo === undefined) {
+      if (options.model === 'scripted' && task.demo === undefined) {
         // 脚本模式只能执行带 demo 的任务；其余跳过并统计，避免表格看起来“全跑过”。
         if (!skipped.includes(task.id)) skipped.push(task.id)
         continue
       }
-      for (let seed = 1; seed <= repeat; seed += 1) {
-        const row = await runOnce(dir, task, arm, seed, model)
-        rows.push(row)
-        process.stdout.write(
-          `  ${arm.name.padEnd(9)} ${task.id.padEnd(12)} ${row.pass ? 'PASS' : 'FAIL'} ` +
-          `rounds=${row.rounds} calls=${row.calls} tokens=${row.promptTokens + row.completionTokens}\n`,
-        )
+      for (let seed = 1; seed <= options.repeat; seed += 1) {
+        plan.push({ arm, task, dir, seed })
       }
     }
   }
 
+  if (options.dryRun) {
+    preview(plan, options)
+    return
+  }
+
+  const rows: Row[] = []
+  let cached = 0
+
+  for (const item of plan) {
+    const path = resultPath(options.model, item.arm.name, item.task.id, item.seed)
+    const existing = options.force ? undefined : loadRow(path)
+    const label = `${item.arm.name.padEnd(9)} ${item.task.id.padEnd(22)}`
+
+    if (existing !== undefined) {
+      rows.push(existing)
+      cached += 1
+      process.stdout.write(`  ${label} cached ${existing.pass ? 'PASS' : 'FAIL'}\n`)
+      continue
+    }
+
+    const row = await withRetry(() => runOnce(item.dir, item.task, item.arm, item.seed, options.model))
+    rows.push(row)
+
+    mkdirSync(dirname(path), { recursive: true })
+    writeFileSync(path, `${JSON.stringify(row, null, 2)}\n`)
+
+    process.stdout.write(
+      `  ${label} ${row.pass ? 'PASS' : 'FAIL'} rounds=${row.rounds} calls=${row.calls} ` +
+      `tokens=${row.promptTokens + row.completionTokens}\n`,
+    )
+  }
+
   process.stdout.write('\n| arm | pass | rounds | calls | failures | tokens | latency |\n')
   process.stdout.write('|---|---|---|---|---|---|---|\n')
-  for (const arm of ARMS) {
+  for (const arm of arms) {
     process.stdout.write(`${summary(rows, arm.name)}\n`)
   }
 
-  if (model === 'scripted') {
+  if (cached > 0) {
+    process.stdout.write(`\n其中 ${cached} 次来自已有结果，${rows.length - cached} 次本次运行。\n`)
+  }
+
+  if (options.model === 'scripted') {
     if (skipped.length > 0) {
-      process.stdout.write(
-        `\n跳过 ${skipped.length} 个没有 demo 的任务：${skipped.join(', ')}\n`,
-      )
+      process.stdout.write(`\n跳过 ${skipped.length} 个没有 demo 的任务：${skipped.join(', ')}\n`)
     }
     process.stdout.write(
       '\n注意：scripted 模式按预设脚本执行，只能验证流水线连通性，不能用于评估能力差异。\n' +

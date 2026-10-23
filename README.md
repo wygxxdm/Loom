@@ -143,7 +143,19 @@ events → session → session-catalog → tools → file-tools → shell-tool
 ```bash
 node --experimental-strip-types bench/runner.ts
 node --experimental-strip-types bench/runner.ts --model deepseek --repeat 3
+
+# 先看要跑多少次、大概多少 token
+node --experimental-strip-types bench/runner.ts --model deepseek --repeat 3 --dry-run
+
+# 只跑其中一部分
+node --experimental-strip-types bench/runner.ts --only fix-clamp,fix-deep-merge --arms baseline,full
 ```
+
+每次运行落一个 json 到 `bench/runs/<model>/<arm>/<task>-s<seed>.json`。重跑时已经完成的会跳过并标 `cached`，加 `--force` 才重跑。
+
+限流（429）和 5xx 会退避重试三次；其它错误直接记为失败，因为确定性失败重试只会浪费时间。
+
+`--dry-run` 会根据已有结果的平均 token 推算剩余开销；想换算成钱就设 `LOOM_PRICE_PER_M`（元/百万 token），不设就只报 token 数——各家价格会变，写死在代码里没意义。
 
 12 个任务，4 个臂：`baseline`、`compact`、`optimize`、`full`。
 

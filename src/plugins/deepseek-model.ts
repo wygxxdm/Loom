@@ -3,6 +3,24 @@ import type { ToolCall } from '../contracts/tools.ts'
 import { ModelKey } from '../contracts/keys.ts'
 import type { Plugin } from '../kernel/plugin.ts'
 
+/**
+ * HTTP 层错误。带上状态码，让上层能区分“值得重试”和“重试也没用”。
+ * 429 是限流、5xx 是服务端抖动，这两种退避重试有意义；4xx 其余情况没有。
+ */
+export class ModelHttpError extends Error {
+  readonly status: number
+
+  constructor(status: number, detail: string) {
+    super(`model http ${status}: ${detail}`)
+    this.name = 'ModelHttpError'
+    this.status = status
+  }
+
+  get retryable(): boolean {
+    return this.status === 429 || this.status >= 500
+  }
+}
+
 export interface DeepSeekOptions {
   readonly apiKey: string
   readonly baseUrl?: string
@@ -73,7 +91,7 @@ export class DeepSeekModel implements ModelPort {
 
     if (!response.ok) {
       const detail = await response.text().catch(() => '')
-      throw new Error(`model http ${response.status}: ${detail.slice(0, 400)}`)
+      throw new ModelHttpError(response.status, detail.slice(0, 400))
     }
 
     return parseReply(await response.json())
