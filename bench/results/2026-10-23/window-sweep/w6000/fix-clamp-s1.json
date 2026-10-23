@@ -1,0 +1,14 @@
+{
+  "arm": "compact",
+  "task": "fix-clamp",
+  "seed": 1,
+  "pass": true,
+  "rounds": 8,
+  "calls": 9,
+  "failures": 0,
+  "promptTokens": 14554,
+  "completionTokens": 1029,
+  "ms": 9787,
+  "checkpoint": false,
+  "compactions": 0
+}

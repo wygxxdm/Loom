@@ -1,0 +1,14 @@
+{
+  "arm": "compact",
+  "task": "feat-csv-export",
+  "seed": 1,
+  "pass": true,
+  "rounds": 10,
+  "calls": 13,
+  "failures": 0,
+  "promptTokens": 26847,
+  "completionTokens": 2438,
+  "ms": 17036,
+  "checkpoint": false,
+  "compactions": 0
+}

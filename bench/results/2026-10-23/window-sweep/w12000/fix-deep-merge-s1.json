@@ -1,0 +1,14 @@
+{
+  "arm": "compact",
+  "task": "fix-deep-merge",
+  "seed": 1,
+  "pass": true,
+  "rounds": 14,
+  "calls": 15,
+  "failures": 0,
+  "promptTokens": 64527,
+  "completionTokens": 7266,
+  "ms": 44517,
+  "checkpoint": false,
+  "compactions": 1
+}

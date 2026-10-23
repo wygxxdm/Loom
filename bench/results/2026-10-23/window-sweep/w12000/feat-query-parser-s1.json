@@ -1,0 +1,14 @@
+{
+  "arm": "compact",
+  "task": "feat-query-parser",
+  "seed": 1,
+  "pass": true,
+  "rounds": 12,
+  "calls": 14,
+  "failures": 0,
+  "promptTokens": 43910,
+  "completionTokens": 2345,
+  "ms": 18234,
+  "checkpoint": false,
+  "compactions": 0
+}

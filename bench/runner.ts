@@ -42,6 +42,8 @@ interface Row {
   readonly completionTokens: number
   readonly ms: number
   readonly checkpoint: boolean
+  /** 本次运行里压缩触发了几次；0 表示窗口一直没超。 */
+  readonly compactions: number
   readonly error?: string
 }
 
@@ -52,6 +54,8 @@ interface Options {
   readonly dryRun: boolean
   readonly only: ReadonlySet<string> | undefined
   readonly arms: ReadonlySet<string> | undefined
+  /** 覆盖 compaction 的窗口上限，用于强制触发压缩的压力测试。 */
+  readonly window: number | undefined
 }
 
 function parseOptions(argv: readonly string[]): Options {
@@ -71,6 +75,7 @@ function parseOptions(argv: readonly string[]): Options {
     dryRun: argv.includes('--dry-run'),
     only: list('--only'),
     arms: list('--arms'),
+    window: value('--window') === undefined ? undefined : Number(value('--window')),
   }
 }
 
@@ -160,6 +165,7 @@ async function runOnce(
   arm: Arm,
   seed: number,
   model: 'deepseek' | 'scripted',
+  window: number | undefined,
 ): Promise<Row> {
   const box = mkdtempSync(join(tmpdir(), `loom-bench-${task.id}-`))
   const runDir = join(box, 'ws')
@@ -187,7 +193,12 @@ async function runOnce(
     sessionPath: join(runDir, '.loom', 'session.jsonl'),
     // 基准跑批无人值守：统一授予 session 级权限，避免因等待确认而超时。
     approver: { ask: async () => 'session' },
-    compactor: { maxTokens: 1_500, threshold: 0.6, keepRecent: 6, enabled: arm.compact },
+    compactor: {
+      maxTokens: window ?? 1_500,
+      threshold: 0.6,
+      keepRecent: 6,
+      enabled: arm.compact,
+    },
     loop: { maxRounds: 20, maxCalls: 40, deadlineMs: 180_000 },
   })
 
@@ -242,12 +253,14 @@ async function runOnce(
     completionTokens: counting.completion,
     ms: report.ms,
     checkpoint: report.checkpoint,
+    compactions: events.filter((event) => event.type === 'context.compacted').length,
     ...(error === undefined ? {} : { error }),
   }
 }
 
-function resultPath(model: string, arm: string, taskId: string, seed: number): string {
-  return resolve('bench', 'runs', model, arm, `${taskId}-s${seed}.json`)
+function resultPath(model: string, arm: string, taskId: string, seed: number, window?: number): string {
+  const bucket = window === undefined ? model : `${model}-w${window}`
+  return resolve('bench', 'runs', bucket, arm, `${taskId}-s${seed}.json`)
 }
 
 function loadRow(path: string): Row | undefined {
@@ -281,7 +294,7 @@ function summary(rows: readonly Row[], arm: string): string {
 }
 
 function preview(plan: readonly { arm: Arm; task: TaskFile; seed: number }[], options: Options): void {
-  const paths = plan.map((item) => resultPath(options.model, item.arm.name, item.task.id, item.seed))
+  const paths = plan.map((item) => resultPath(options.model, item.arm.name, item.task.id, item.seed, options.window))
   const cached = paths.filter((path) => existsSync(path) && loadRow(path) !== undefined).length
   const pending = plan.length - cached
 
@@ -355,7 +368,7 @@ async function main(): Promise<void> {
   let cached = 0
 
   for (const item of plan) {
-    const path = resultPath(options.model, item.arm.name, item.task.id, item.seed)
+    const path = resultPath(options.model, item.arm.name, item.task.id, item.seed, options.window)
     const existing = options.force ? undefined : loadRow(path)
     const label = `${item.arm.name.padEnd(9)} ${item.task.id.padEnd(22)}`
 
@@ -366,7 +379,7 @@ async function main(): Promise<void> {
       continue
     }
 
-    const row = await withRetry(() => runOnce(item.dir, item.task, item.arm, item.seed, options.model))
+    const row = await withRetry(() => runOnce(item.dir, item.task, item.arm, item.seed, options.model, options.window))
     rows.push(row)
 
     mkdirSync(dirname(path), { recursive: true })
@@ -374,7 +387,7 @@ async function main(): Promise<void> {
 
     process.stdout.write(
       `  ${label} ${row.pass ? 'PASS' : 'FAIL'} rounds=${row.rounds} calls=${row.calls} ` +
-      `tokens=${row.promptTokens + row.completionTokens}\n`,
+      `tokens=${row.promptTokens + row.completionTokens} compact=${row.compactions}\n`,
     )
   }
 

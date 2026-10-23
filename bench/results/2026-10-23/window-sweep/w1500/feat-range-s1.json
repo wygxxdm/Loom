@@ -1,0 +1,14 @@
+{
+  "arm": "compact",
+  "task": "feat-range",
+  "seed": 1,
+  "pass": true,
+  "rounds": 7,
+  "calls": 8,
+  "failures": 0,
+  "promptTokens": 12660,
+  "completionTokens": 2254,
+  "ms": 15558,
+  "checkpoint": false,
+  "compactions": 1
+}

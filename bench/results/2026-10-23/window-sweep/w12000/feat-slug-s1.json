@@ -1,0 +1,14 @@
+{
+  "arm": "compact",
+  "task": "feat-slug",
+  "seed": 1,
+  "pass": true,
+  "rounds": 6,
+  "calls": 8,
+  "failures": 0,
+  "promptTokens": 9523,
+  "completionTokens": 1063,
+  "ms": 7932,
+  "checkpoint": false,
+  "compactions": 0
+}

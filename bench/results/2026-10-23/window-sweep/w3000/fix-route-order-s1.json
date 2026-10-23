@@ -1,0 +1,14 @@
+{
+  "arm": "compact",
+  "task": "fix-route-order",
+  "seed": 1,
+  "pass": true,
+  "rounds": 9,
+  "calls": 13,
+  "failures": 0,
+  "promptTokens": 25259,
+  "completionTokens": 6048,
+  "ms": 34449,
+  "checkpoint": false,
+  "compactions": 1
+}
