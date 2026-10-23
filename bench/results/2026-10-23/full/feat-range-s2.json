@@ -1,0 +1,13 @@
+{
+  "arm": "full",
+  "task": "feat-range",
+  "seed": 2,
+  "pass": true,
+  "rounds": 7,
+  "calls": 8,
+  "failures": 0,
+  "promptTokens": 14494,
+  "completionTokens": 3127,
+  "ms": 21494,
+  "checkpoint": false
+}

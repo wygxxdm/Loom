@@ -1,0 +1,13 @@
+{
+  "arm": "full",
+  "task": "fix-clamp",
+  "seed": 2,
+  "pass": true,
+  "rounds": 6,
+  "calls": 8,
+  "failures": 0,
+  "promptTokens": 10661,
+  "completionTokens": 1857,
+  "ms": 15380,
+  "checkpoint": false
+}

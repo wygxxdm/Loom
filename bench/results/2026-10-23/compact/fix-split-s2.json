@@ -1,0 +1,13 @@
+{
+  "arm": "compact",
+  "task": "fix-split",
+  "seed": 2,
+  "pass": true,
+  "rounds": 6,
+  "calls": 8,
+  "failures": 0,
+  "promptTokens": 12197,
+  "completionTokens": 2193,
+  "ms": 16241,
+  "checkpoint": false
+}

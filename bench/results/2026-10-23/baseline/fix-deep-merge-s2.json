@@ -1,0 +1,13 @@
+{
+  "arm": "baseline",
+  "task": "fix-deep-merge",
+  "seed": 2,
+  "pass": true,
+  "rounds": 11,
+  "calls": 12,
+  "failures": 0,
+  "promptTokens": 40158,
+  "completionTokens": 4104,
+  "ms": 26488,
+  "checkpoint": false
+}

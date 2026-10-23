@@ -1,0 +1,13 @@
+{
+  "arm": "full",
+  "task": "refactor-extract-validator",
+  "seed": 1,
+  "pass": true,
+  "rounds": 7,
+  "calls": 11,
+  "failures": 0,
+  "promptTokens": 14492,
+  "completionTokens": 2525,
+  "ms": 18372,
+  "checkpoint": false
+}

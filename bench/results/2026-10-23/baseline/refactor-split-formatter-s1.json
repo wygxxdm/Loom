@@ -1,0 +1,13 @@
+{
+  "arm": "baseline",
+  "task": "refactor-split-formatter",
+  "seed": 1,
+  "pass": true,
+  "rounds": 7,
+  "calls": 9,
+  "failures": 0,
+  "promptTokens": 15146,
+  "completionTokens": 1048,
+  "ms": 9917,
+  "checkpoint": false
+}

@@ -1,0 +1,13 @@
+{
+  "arm": "compact",
+  "task": "fix-cache-ttl",
+  "seed": 2,
+  "pass": true,
+  "rounds": 7,
+  "calls": 7,
+  "failures": 0,
+  "promptTokens": 16681,
+  "completionTokens": 3710,
+  "ms": 24866,
+  "checkpoint": false
+}

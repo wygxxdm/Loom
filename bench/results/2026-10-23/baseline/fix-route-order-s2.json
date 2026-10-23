@@ -1,0 +1,13 @@
+{
+  "arm": "baseline",
+  "task": "fix-route-order",
+  "seed": 2,
+  "pass": true,
+  "rounds": 10,
+  "calls": 10,
+  "failures": 0,
+  "promptTokens": 24828,
+  "completionTokens": 2517,
+  "ms": 19558,
+  "checkpoint": false
+}

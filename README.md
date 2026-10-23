@@ -165,6 +165,29 @@ node --experimental-strip-types bench/runner.ts --only fix-clamp,fix-deep-merge 
 | bugfix | `fix-route-order`、`fix-cache-ttl`、`fix-deep-merge`、`fix-clamp`、`fix-split` |
 | refactor | `refactor-extract-validator`、`refactor-split-formatter` |
 
+### 结果
+
+`deepseek-flash`，2 个 seed，共 96 次运行，花费约 2 元（0.66M / 0.64M / 0.95M / 0.49M token）。
+
+| arm | pass | 中位数 token | 均值 token | 平均延迟 |
+| --- | --- | --- | --- | --- |
+| baseline | 24/24 | **16,147** | 27,439 | 15.6s |
+| compact | 24/24 | 18,553 | 26,652 | 32.0s |
+| optimize | 24/24 | 28,254 | 39,390 | 21.6s |
+| full | 24/24 | 17,776 | **20,327** | 23.3s |
+
+四臂成功率完全一样，token 差异集中在少数几道题上。三点观察：
+
+1. **成功率没有差异。** 12 道题在这个模型上都能做完，且 1M 上下文远没到上限，所以压缩不影响正确性。
+2. **中位数上 baseline 最省。** 压缩要额外调一次模型生成摘要，改写要多一次请求，短任务上回不了本——12 道题里 baseline 有 7 道是最省的。
+3. **均值上 full 最省，但完全由一道题决定。** `fix-deep-merge` 两次运行 baseline 是 222k / 44k，full 是 32k / 26k。压缩压的是长尾，不是均值。
+
+改写（`optimize`）在两个 seed 下都明显更贵，中位数是 baseline 的 1.75 倍，两个种子一致，不是噪声。让模型先重述一遍需求，它会探索更多、跑更多轮。
+
+所以在这批任务上：**上下文机制是成本保险，不是性能优化。** 要观察到成功率差异，任务得长到接近窗口上限，或者需要大量探索。这个结论和"压缩能提升能力"的直觉相反，但它是这 96 次运行给出的。
+
+原始结果在 `bench/results/2026-10-23/`，可以复算。
+
 每题是一个独立的小工作区，附一份 spec。agent 在副本里工作，验证之前用工作区外的原始 spec 覆盖回去，改测试不算通过。每个任务都验证过两件事：初始工作区跑 spec 必须失败，参考解打上之后必须通过。
 
 `scripted` 模式只是流水线冒烟：模型按预设脚本执行，只有 4 个任务带 demo，其余会被跳过并列出来。跑出来的成功率没有参考价值。要看数字得用 `--model deepseek`，并且每个任务跑多次。
@@ -190,7 +213,7 @@ CI 在 ubuntu 和 macos 上跑这三条。
 - 工具参数没有做 JSON Schema 校验，类型错了会在工具内部抛出来。
 - 上下文窗口上限是配置常量，没有从模型读取。
 - Windows 没验证过，进程组回收依赖 POSIX 语义。
-- benchmark 12 题，够做方向性对照，不够支撑显著性结论。任务都是单仓库小改动，和真实长任务还有距离。
+- benchmark 12 题、2 个 seed，只够看方向。四臂成功率打平，不是因为机制无效，而是这些题都没跑满上下文——要测出压缩对成功率的影响，任务得长到几十万 token 量级。
 
 ## License
 

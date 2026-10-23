@@ -1,0 +1,13 @@
+{
+  "arm": "full",
+  "task": "fix-split",
+  "seed": 2,
+  "pass": true,
+  "rounds": 6,
+  "calls": 8,
+  "failures": 0,
+  "promptTokens": 11441,
+  "completionTokens": 2433,
+  "ms": 18989,
+  "checkpoint": false
+}

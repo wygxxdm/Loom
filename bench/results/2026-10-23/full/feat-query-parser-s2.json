@@ -1,0 +1,13 @@
+{
+  "arm": "full",
+  "task": "feat-query-parser",
+  "seed": 2,
+  "pass": true,
+  "rounds": 11,
+  "calls": 13,
+  "failures": 0,
+  "promptTokens": 31984,
+  "completionTokens": 8082,
+  "ms": 48049,
+  "checkpoint": false
+}

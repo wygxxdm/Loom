@@ -1,0 +1,13 @@
+{
+  "arm": "baseline",
+  "task": "fix-clamp",
+  "seed": 2,
+  "pass": true,
+  "rounds": 6,
+  "calls": 7,
+  "failures": 0,
+  "promptTokens": 8723,
+  "completionTokens": 454,
+  "ms": 6355,
+  "checkpoint": false
+}

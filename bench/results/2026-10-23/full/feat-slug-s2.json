@@ -1,0 +1,13 @@
+{
+  "arm": "full",
+  "task": "feat-slug",
+  "seed": 2,
+  "pass": true,
+  "rounds": 6,
+  "calls": 8,
+  "failures": 0,
+  "promptTokens": 10674,
+  "completionTokens": 2156,
+  "ms": 16714,
+  "checkpoint": false
+}

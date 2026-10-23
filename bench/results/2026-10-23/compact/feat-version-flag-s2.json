@@ -1,0 +1,13 @@
+{
+  "arm": "compact",
+  "task": "feat-version-flag",
+  "seed": 2,
+  "pass": true,
+  "rounds": 8,
+  "calls": 11,
+  "failures": 0,
+  "promptTokens": 19674,
+  "completionTokens": 2978,
+  "ms": 22944,
+  "checkpoint": false
+}
