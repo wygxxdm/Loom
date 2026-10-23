@@ -53,9 +53,9 @@ export class DeepSeekModel implements ModelPort {
     this.#options = {
       apiKey: options.apiKey,
       baseUrl: options.baseUrl ?? process.env.LOOM_BASE_URL ?? 'https://api.deepseek.com',
-      model: options.model ?? process.env.LOOM_MODEL ?? 'deepseek-chat',
+      model: options.model ?? process.env.LOOM_MODEL ?? 'deepseek-flash',
       temperature: options.temperature ?? 0,
-      maxTokens: options.maxTokens ?? 4_096,
+      maxTokens: options.maxTokens ?? 8_192,
     }
   }
 
