@@ -1,0 +1,10 @@
+{
+  "id": "refactor-split-formatter",
+  "category": "refactor",
+  "difficulty": "medium",
+  "prompt": "invoice 里的金额格式化逻辑要抽成 formatAmount(cents: number, currency: string): string，放在 money 模块并导出；formatInvoice 改成调用它，输出保持不变。",
+  "verify": {
+    "command": "node --experimental-strip-types --test spec/money.test.ts",
+    "timeoutMs": 30000
+  }
+}

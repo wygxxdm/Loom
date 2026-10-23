@@ -1,0 +1,10 @@
+{
+  "id": "feat-query-parser",
+  "category": "feature",
+  "difficulty": "medium",
+  "prompt": "在 url 模块实现并导出 parseQuery(query: string): Record<string, string | string[]>。要求：空串返回空对象；重复键收集成数组；没有等号的键取空串；百分号编码和 + 都要解码，复用 format 模块已有的解码函数；忽略空片段。",
+  "verify": {
+    "command": "node --experimental-strip-types --test spec/query.test.ts",
+    "timeoutMs": 30000
+  }
+}

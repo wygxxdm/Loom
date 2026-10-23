@@ -1,0 +1,10 @@
+{
+  "id": "fix-cache-ttl",
+  "category": "bugfix",
+  "difficulty": "medium",
+  "prompt": "TTL 缓存没生效：过了 ttl 还能取到值，size 也不会减少。要求 get 遇到过期项返回 undefined 并顺手清掉，size 不统计过期项，重新 set 要刷新过期时间。",
+  "verify": {
+    "command": "node --experimental-strip-types --test spec/cache.test.ts",
+    "timeoutMs": 30000
+  }
+}

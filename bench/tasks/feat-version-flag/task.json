@@ -1,0 +1,10 @@
+{
+  "id": "feat-version-flag",
+  "category": "feature",
+  "difficulty": "medium",
+  "prompt": "给 CLI 加 --version 支持：parseArgs 的返回值要新增 version: boolean，并且 --version 不能被当成子命令。同时让 info 导出 describe(): string 返回 `acme 1.2.3`，cli 导出 renderVersion(): string 复用 describe 的结果。",
+  "verify": {
+    "command": "node --experimental-strip-types --test spec/version.test.ts",
+    "timeoutMs": 30000
+  }
+}

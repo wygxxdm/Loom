@@ -1,0 +1,10 @@
+{
+  "id": "fix-route-order",
+  "category": "bugfix",
+  "difficulty": "hard",
+  "prompt": "访问 /users/me 返回的是 user:me，应该是 me。/users/42 和 /users 都正常。找出原因并修复，不要改 handler 返回的内容。",
+  "verify": {
+    "command": "node --experimental-strip-types --test spec/router.test.ts",
+    "timeoutMs": 30000
+  }
+}

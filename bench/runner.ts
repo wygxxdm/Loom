@@ -220,12 +220,17 @@ async function main(): Promise<void> {
 
   const tasks = readTasks(resolve('bench', 'tasks'))
   const rows: Row[] = []
+  const skipped: string[] = []
 
   process.stdout.write(`model=${model} tasks=${tasks.length} arms=${ARMS.length} seeds=${repeat}\n`)
 
   for (const arm of ARMS) {
     for (const { dir, task } of tasks) {
-      if (model === 'scripted' && task.demo === undefined) continue
+      if (model === 'scripted' && task.demo === undefined) {
+        // 脚本模式只能执行带 demo 的任务；其余跳过并统计，避免表格看起来“全跑过”。
+        if (!skipped.includes(task.id)) skipped.push(task.id)
+        continue
+      }
       for (let seed = 1; seed <= repeat; seed += 1) {
         const row = await runOnce(dir, task, arm, seed, model)
         rows.push(row)
@@ -244,6 +249,11 @@ async function main(): Promise<void> {
   }
 
   if (model === 'scripted') {
+    if (skipped.length > 0) {
+      process.stdout.write(
+        `\n跳过 ${skipped.length} 个没有 demo 的任务：${skipped.join(', ')}\n`,
+      )
+    }
     process.stdout.write(
       '\n注意：scripted 模式按预设脚本执行，只能验证流水线连通性，不能用于评估能力差异。\n' +
       '真实数字请用 --model deepseek 重跑。\n',

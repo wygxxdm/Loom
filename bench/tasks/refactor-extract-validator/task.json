@@ -1,0 +1,10 @@
+{
+  "id": "refactor-extract-validator",
+  "category": "refactor",
+  "difficulty": "medium",
+  "prompt": "signup 和 invite 里的邮箱校验重复了。抽出 isEmail(email: string): boolean 放在 validate 模块并导出，两处都改用它，对外行为不能变。",
+  "verify": {
+    "command": "node --experimental-strip-types --test spec/validate.test.ts",
+    "timeoutMs": 30000
+  }
+}

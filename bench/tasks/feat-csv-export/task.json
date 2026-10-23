@@ -1,0 +1,10 @@
+{
+  "id": "feat-csv-export",
+  "category": "feature",
+  "difficulty": "medium",
+  "prompt": "导出 CSV 的转义不完整：含引号的字段没有把引号翻倍，含换行的字段没有加引号。另外空行应该被跳过。转义逻辑在 csv 模块，拼装在 report 模块。",
+  "verify": {
+    "command": "node --experimental-strip-types --test spec/csv.test.ts",
+    "timeoutMs": 30000
+  }
+}

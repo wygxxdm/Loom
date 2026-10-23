@@ -145,9 +145,17 @@ node --experimental-strip-types bench/runner.ts
 node --experimental-strip-types bench/runner.ts --model deepseek --repeat 3
 ```
 
-4 个任务，4 个臂：`baseline`、`compact`、`optimize`、`full`。agent 在副本里工作，验证之前用工作区外的原始 spec 覆盖回去，改测试不算通过。
+12 个任务，4 个臂：`baseline`、`compact`、`optimize`、`full`。
 
-`scripted` 模式只是流水线冒烟：模型按预设脚本执行，跑出来的成功率没有参考价值。要看数字得用 `--model deepseek`，并且每个任务跑多次。
+| 类别 | 任务 |
+| --- | --- |
+| feature | `feat-version-flag`、`feat-query-parser`、`feat-csv-export`、`feat-slug`、`feat-range` |
+| bugfix | `fix-route-order`、`fix-cache-ttl`、`fix-deep-merge`、`fix-clamp`、`fix-split` |
+| refactor | `refactor-extract-validator`、`refactor-split-formatter` |
+
+每题是一个独立的小工作区，附一份 spec。agent 在副本里工作，验证之前用工作区外的原始 spec 覆盖回去，改测试不算通过。每个任务都验证过两件事：初始工作区跑 spec 必须失败，参考解打上之后必须通过。
+
+`scripted` 模式只是流水线冒烟：模型按预设脚本执行，只有 4 个任务带 demo，其余会被跳过并列出来。跑出来的成功率没有参考价值。要看数字得用 `--model deepseek`，并且每个任务跑多次。
 
 ## 开发
 
@@ -170,7 +178,7 @@ CI 在 ubuntu 和 macos 上跑这三条。
 - 工具参数没有做 JSON Schema 校验，类型错了会在工具内部抛出来。
 - 上下文窗口上限是配置常量，没有从模型读取。
 - Windows 没验证过，进程组回收依赖 POSIX 语义。
-- benchmark 只有 4 题，是流水线样本，不是评测集。
+- benchmark 12 题，够做方向性对照，不够支撑显著性结论。任务都是单仓库小改动，和真实长任务还有距离。
 
 ## License
 

@@ -1,0 +1,10 @@
+{
+  "id": "fix-deep-merge",
+  "category": "bugfix",
+  "difficulty": "hard",
+  "prompt": "merge 现在是浅合并：嵌套对象被整体替换，undefined 会把已有值抹掉。要求嵌套对象递归合并、数组整体替换、undefined 不覆盖、null 正常覆盖、不修改入参。",
+  "verify": {
+    "command": "node --experimental-strip-types --test spec/merge.test.ts",
+    "timeoutMs": 30000
+  }
+}
